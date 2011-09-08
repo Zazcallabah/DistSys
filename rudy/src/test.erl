@@ -3,7 +3,7 @@
 
 bench(Host, Port) ->
 	Start = now(),
-	run(100, Host, Port),
+	run(1000, Host, Port),
 	Finish = now(),
 	timer:now_diff(Finish, Start).
 
@@ -18,8 +18,16 @@ run( N, Host, Port )->
 
 request(Host,Port) ->
 	Opt = [list, {active, false}, {reuseaddr, true}],
-	{ok, Server} = gen_tcp:connect(Host, Port, Opt),
-	gen_tcp:send(Server, http:get("foo")),
+	Recv = gen_tcp:connect(Host, Port, Opt),
+	case Recv of
+		{ok, Server} ->
+			comms( Server );
+		{error, Code} ->
+			request(Host,Port)
+	end.
+
+comms( Server ) ->
+	gen_tcp:send(Server, http:get("http://www.kth.se/student/program-kurser/kurshemsidor/kurser-ict/ID2201/HT11-1/2.34722/rudy-a-small-web-server-1.184822?l=en_UK")),
 	Recv = gen_tcp:recv(Server, 0),
 	case Recv of
 		{ok, _} ->
