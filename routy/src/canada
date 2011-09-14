@@ -1,0 +1,43 @@
+#!/usr/bin/env escript
+%%! -name canada -sname canada -setcookie routy -connect_all false
+
+main(_) ->
+	make:all(),
+	routy:start(toronto),
+	routy:start(edmonton),
+	
+	io:fread("wait for other shell", "~s"),
+
+	toronto ! {add, washington, {washington, 'us@AOEU'}},
+	edmonton ! {add, washington, {washington, 'us@AOEU'}},
+	edmonton ! {add, toronto, {toronto, 'canada@AOEU'}},
+	
+	toronto ! {broadcast},
+	toronto ! {update},
+	edmonton ! {broadcast},
+	edmonton ! {update},
+	send().
+	
+send() ->
+	case io:fread("send:", "~a ~a ~s") of
+		{ok, [Target, i, _]} ->
+			Target ! {status, self()};
+		{ok, [Target, u, _]} ->
+			Target ! update;
+		{ok, [Target, b, _]} ->
+			Target ! broadcast;
+		{ok, [edmonton, To, Msg]} ->
+			edmonton ! {send, To, Msg };
+		{ok, [toronto, To, Msg]} ->
+			toronto ! {send, To, Msg };
+		{ok, _} ->
+			io:format("bad origin~n");
+		{error, What} ->
+			io:format("error ~w ~n", [What])
+	end,
+	send().
+
+
+
+	
+
