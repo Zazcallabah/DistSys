@@ -1,8 +1,7 @@
-#!/usr/bin/env escript
-%%! -name canada@130.229.181.78 -setcookie routy -connect_all false
+-module(setup).
+-export([menu/0, start/0]).
 
-main(_) ->
-	make:all(),
+start() ->
 	routy:start(toronto),
 	routy:start(montreal),
 	routy:start(edmonton),
@@ -10,8 +9,6 @@ main(_) ->
 	routy:start(winnipeg),
 	routy:start(hamilton),
 	
-	io:fread("wait for other shell", "~s"),
-
 	toronto ! {add, calgary, {calgary, 'canada@130.229.181.78'}},
 		calgary ! {add, toronto, {toronto, 'canada@130.229.181.78'}},
 	toronto ! {add, montreal, {montreal, 'canada@130.229.181.78'}},
@@ -22,7 +19,7 @@ main(_) ->
 	edmonton ! {add, hamilton, {hamilton, 'canada@130.229.181.78'}},
 	edmonton ! {add, winnipeg, {winnipeg, 'canada@130.229.181.78'}}.
 	
-send() ->
+menu() ->
 	case io:fread("cmd target p1 p2: ", "~a ~a ~a ~a") of
 		{ok, [add, Target, P1, P2]}->
 			Target ! {add, P1, {P1, P2}};
@@ -35,13 +32,13 @@ send() ->
 		{ok, [send, Target, To, Msg]} ->
 			Target ! {send, To, Msg };
 		{ok, [exit, _,_,_]} ->
-			exit(0),
+			exit(0);
 		{ok, _} ->
 			io:format("bad origin~n");
 		{error, What} ->
 			io:format("error ~w ~n", [What])
 	end,
-	send().
+	menu().
 
 
 
