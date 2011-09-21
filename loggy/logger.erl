@@ -1,5 +1,6 @@
 -module(logger).
--export([start/1, stop/1, removeandloglessthann/3]).
+-export([start/1, stop/1]).
+-export([ remove_and_log_less_than_n/3,inject_message_into_queue/4,find_lowest_common/2, map_message_entries/4]).
 
 start(Nodes) ->
 	spawn(fun() ->init(Nodes) end).
@@ -8,40 +9,56 @@ stop(Logger) ->
 	Logger ! stop.
 
 init( Nodes ) ->
-	loop( lists:map( (fun(A) -> {A, []} end, Nodes ) ).
+	loop(
+		lists:map( (fun(A) -> {A, []} end), Nodes )
+		).
+	
+inject_message_into_queue( Queue, From, Time, Msg ) ->
+	lists:map( (fun({Name, Lst}) ->
+		if
+			Name =:= From -> {From, [{Time,Msg}|Lst]};
+			true -> {Name, Lst}
+		end
+		end),
+		Queue ).
 
 loop(Queue) ->
 	receive
 		{log, From, Time, Msg} ->
-			case lists:keysearch( From, 1, Queue ) of
-				{value, {}} ->
-					
-				false ->
-					UpdatedQueue = [{From,[{Time,Msg}]}|Queue],
-			end
-			
-			%% add {time, msg} into Queue.from.2
-			N = findlowestcommon( From, Time, UpdatedQueue ),
-			PrunedQueue = removeandloglessthann( N, UpdatedQueue,
-				(fun({Source,TimeStamp,Message}) ->
-					log(Source,TimeStamp,Message)
-				end) ),
+			UpdatedQueue = inject_message_into_queue( Queue, From, Time, Msg ),
+			N = find_lowest_common( Time, UpdatedQueue ),
+			PrunedQueue = remove_and_log_less_than_n( N, UpdatedQueue, fun log/3 ),
 			loop(PrunedQueue);
 		stop ->
 			ok
 	end.
-	
-findlowestcommon( From, PingTime, Queue ) ->
-	2.
-			%% find lowest common (use Time value given)
 
-	%% queue = [ {from, [{n,msg},...]},...]
-removeandloglessthann( N, Queue, Log ) ->
-	PrunedQueue = lists:map( (fun(A) -> N end), Queue ),
-	%% map over queue (  [ [ {from, n, msg}, ...] , [] ]
-			%% save any n > N
-			%% Log all n <= N
-	Queue.
+find_lowest_common( CurrentMin, [{_, []} |_] ) ->
+	0;
+find_lowest_common( CurrentMin, [{From, List}|[]] ) ->
+	{N,_} = lists:nth(1,List),
+	erlang:min( CurrentMin, N);
+find_lowest_common( CurrentMin, [{From, List}|T] ) ->
+	{N,_} = lists:nth(1,List),
+	Min = erlang:min( CurrentMin, N),
+	find_lowest_common( Min, T ).
+ 
+remove_and_log_less_than_n( N, Queue, Log ) ->
+	PrunedQueue = lists:map( (fun({From,Lst}) -> 
+		UpdatedLst = lists:filter( (fun(Entry) ->
+			map_message_entries( Log,From,N,Entry) end),
+			Lst),
+		{From,UpdatedLst}
+	end) , Queue ),
+	PrunedQueue.
+
+
+	
+map_message_entries( Log, From, N, {TimeStamp, Msg} ) when TimeStamp < N ->
+	Log( From, TimeStamp, Msg ),
+	false;
+map_message_entries( Log, From, N, {TimeStamp, Msg} ) ->
+	true.
 
 log(From, Time, Msg) ->
 	io:format("log: ~w ~w ~p~n", [From, Time, Msg]).
