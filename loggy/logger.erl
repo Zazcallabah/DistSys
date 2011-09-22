@@ -1,6 +1,6 @@
 -module(logger).
 -export([start/1, stop/1]).
--export([ remove_and_log_less_than_n/3,inject_message_into_queue/4,find_lowest_common/2, map_message_entries/4]).
+-export([ remove_and_log_less_than_n/3,inject_message_into_queue/4,find_lowest_common/2, map_message_entries/4, loop/2]).
 
 start(Nodes) ->
 	spawn(fun() ->init(Nodes) end).
@@ -10,7 +10,8 @@ stop(Logger) ->
 
 init( Nodes ) ->
 	loop(
-		lists:map( (fun(A) -> {A, []} end), Nodes )
+		lists:map( (fun(A) -> {A, []} end), Nodes ),
+		fun log/3 
 		).
 	
 inject_message_into_queue( Queue, From, Time, Msg ) ->
@@ -22,13 +23,13 @@ inject_message_into_queue( Queue, From, Time, Msg ) ->
 		end),
 		Queue ).
 
-loop(Queue) ->
+loop(Queue, Log) ->
 	receive
 		{log, From, Time, Msg} ->
 			UpdatedQueue = inject_message_into_queue( Queue, From, Time, Msg ),
 			N = find_lowest_common( Time, UpdatedQueue ),
-			PrunedQueue = remove_and_log_less_than_n( N, UpdatedQueue, fun log/3 ),
-			loop(PrunedQueue);
+			PrunedQueue = remove_and_log_less_than_n( N, UpdatedQueue, Log ),
+			loop(PrunedQueue, Log);
 		stop ->
 			ok
 	end.
@@ -52,8 +53,6 @@ remove_and_log_less_than_n( N, Queue, Log ) ->
 	end) , Queue ),
 	PrunedQueue.
 
-
-	
 map_message_entries( Log, From, N, {TimeStamp, Msg} ) when TimeStamp < N ->
 	Log( From, TimeStamp, Msg ),
 	false;

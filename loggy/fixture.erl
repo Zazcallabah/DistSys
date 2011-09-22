@@ -1,5 +1,46 @@
 -module(fixture).
+-export([run/0]).
 -include_lib("eunit/include/eunit.hrl").
+
+
+trackincoming( Hits ) ->
+	receive
+		{hit, From, Time, {received, Msg} } ->
+			case lists:keyfind( Msg, 3, Hits ) of
+				false ->
+					1 = 2;
+				{F,T,M}->
+					trackincoming( lists:delete({F,T,M},Hits) )
+			end;
+			
+		{hit, From, Time, {sending, Msg} } ->
+			trackincoming( [ {From, Time, Msg} | Hits] )
+	end.
+
+
+logstart( Nodes ) ->
+	Assert = spawn(fun() -> trackincoming([]) end),
+	logger:loop(
+		lists:map( (fun(A) -> {A, []} end), Nodes ),
+		(fun(From, Time, Msg) -> Assert ! {hit, From, Time, Msg} end)
+		).
+
+run() ->
+	Log = spawn( (fun () -> logstart([john, paul, ringo, george] ) end) ),
+	A = worker:start(john, Log, 13, 2000, 100),
+	B = worker:start(paul, Log, 34,8000, 100),
+	C = worker:start(ringo, Log, 45, 2000, 100),
+	D = worker:start(george, Log, 19, 4000, 100),
+	A ! {peers, [B, C, D]},
+	B ! {peers, [A, C, D]},
+	C ! {peers, [A, B, D]},
+	D ! {peers, [A, B, C]},
+	timer:sleep( 9000 ),
+	Log ! stop,
+	A ! stop,
+	B ! stop,
+	C ! stop,
+	D ! stop.
 
 injectmessageworkssimple_test() ->
 	Q = [
