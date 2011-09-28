@@ -2,22 +2,44 @@
 -export([manual/0]).
 -include_lib("eunit/include/eunit.hrl").
 
+start(Link,N) ->
+	worker:start(N,gms,600, Link, 2000 ).
+
 manual()->
 	Leader = worker:start( 0, gms, 500, 3000 ),
-	S1 = worker:start(1,gms,200,Leader,3000),
-	S2 = worker:start(2,gms,400,Leader,2000),
-	S3 = worker:start(3,gms,240,Leader,4000),
-	S4 = worker:start(4,gms,500,S2,1000),
-	S5 = worker:start(5,gms,100,Leader,3000),
-	S6 = worker:start(6,gms,600,S5,3050),
-	S7 = worker:start(7,gms,50,S2,3000),
-	S8 = worker:start(8,gms,1100,S6,2000),
-	S9 = worker:start(9,gms,100,S1,3000),
-	timer:sleep(5000),
-	Leader ! stop,
-	timer:sleep(5000)
-	.
+	ll( 1, 250, 60, [Leader]).
+	
+ll( N, Wait, End, Bag )->
+	timer:sleep(  random:uniform(100) ),
+	receive
+		A -> ok
+	after Wait ->
+		if
+			N =:= End ->
+				ok;
+			N rem 8 =:= 1 ->
+				Target = oneof(Bag),
+				NewBag = [start(Target,N)|Bag],
+				ll( N+1, Wait, End, NewBag );
+			N rem 10 =:= 5 ->
+				NewBag = killoneof( Bag ),
+				ll( N+1, Wait, End, NewBag );
+			true ->
+				ll( N+1, Wait, End, Bag)
+		end
+	end.
+	
+oneof( Bag ) ->
+	N = random:uniform( length(Bag) ),
+	lists:nth(N, Bag).
+killoneof( Bag ) ->
+	N = random:uniform( length(Bag) ),
+	remove(N,Bag).
 
+remove(_, []) -> []; 
+remove(1, [_|T]) -> T; 
+remove(N, [H|T]) -> [H | remove(N-1, T)]. 
+	
 recipient( Count ) ->
 	receive
 		{msg} ->

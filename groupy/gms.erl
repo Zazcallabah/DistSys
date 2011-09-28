@@ -1,6 +1,6 @@
 -module(gms).
 -export([start/1, start/2]).
--export([bcast/3, joining/4]).
+-export([bcast/3, joining/5]).
 
 -define(crashchance, 50). %% one-in-N
 
@@ -11,7 +11,7 @@ start(Id) ->
 
 init(Id,Rnd, Master) ->
 	random:seed(Rnd,Rnd,Rnd),
-	leader(Id, Master, []).
+	leader(Id, Master,0, []).
 
 start(Id, Grp) ->
 	Rnd = random:uniform(1000),
@@ -23,66 +23,74 @@ init(Id,Rnd, Grp, Master) ->
 	random:seed(Rnd,Rnd,Rnd),
 	Grp ! {join, Self},
 	receive
-		{view, State, Leader, Peers} ->
+		{view, N, State, Leader, Peers} ->
 			erlang:monitor(process, Leader),
 			Master ! {ok, State},
-			slave(Id, Master, Leader, Peers)
-		after 1000 ->
+			slave(Id, Master, Leader, N+1, {view, N, State,Leader,Peers}, Peers)
+		after 2000 ->
 			Master ! {error, "no reply from leader"}
 	end.
 	
-slave(Id, Master, Leader, Peers) ->
+slave(Id, Master, Leader, N, Last, Peers) ->
 	receive
 		{mcast, Msg} ->
 			Leader ! {mcast, Msg},
-			slave(Id, Master, Leader, Peers);
+			slave(Id, Master, Leader, N, Last, Peers);
 		{join, Peer} ->
 			Leader ! {join, Peer},
-			slave(Id, Master, Leader, Peers);
-		{msg, Msg} ->
+			slave(Id, Master, Leader, N, Last, Peers);
+		{msg, I, _} when I < N ->
+			slave(Id, Master, Leader, N, Last, Peers);
+		{msg, N, Msg} ->
 			Master ! {deliver, Msg},
-			slave(Id, Master, Leader, Peers);
-		{view, _, _, UpdatedPeerList} ->
-			slave(Id, Master, Leader, UpdatedPeerList);
+			slave(Id, Master, Leader, N+1, {msg,N,Msg}, Peers);
+		{view, N, A, B, UpdatedPeerList} ->
+			slave(Id, Master, Leader,N+1,{view,N,A,B,UpdatedPeerList}, UpdatedPeerList);
 		{'DOWN', _Ref, process, Leader, _Reason} ->
-			election(Id,Master,Peers);
+			election(Id,Master,N,Last,Peers);
 		stop ->
 			ok;
 		Error ->
-			io:format("gms ~w: slave, strange message ~w~n", [Id, Error])
+			io:format("gms ~w: slave n:~w, strange message ~w~n", [Id,N, Error])
 	end.
 	
-election(Id, Master, [Leader|Rest] ) ->
-	io:format("--~w: electing new leader ~w~n",[Id, Leader]),
+election(Id, Master,N,Last, [Leader|Rest] ) ->
+	io:format("--~w: electing new leader ~w |~w|~w ~n",[Id, Leader,N,Last]),
 	if
 		Leader == self() ->
-			leader(Id,Master,Rest);
+			bcast( Id, Last, Rest ),
+			case Last of
+				{view, M, _,_,_} ->
+					leader(Id,Master,M+1,Rest);
+				{msg,M,_} ->
+					leader(Id,Master,M+1,Rest)
+			end;
 		true ->
 			erlang:monitor(process, Leader),
-			slave( Id, Master,Leader,Rest)
+			slave( Id, Master,Leader,N,Last,Rest)
 	end.
 	
-leader(Id, Master, Peers) ->
+leader(Id, Master,N, Peers) ->
 	receive
 		{mcast, Msg} ->
-			bcast(Id, {msg, Msg}, Peers),
+			bcast(Id, {msg,N, Msg}, Peers),
 			Master ! {deliver, Msg},
-			leader(Id, Master, Peers);
+			leader(Id, Master,N+1, Peers);
 		{join, Peer} ->
 			Master ! request,
-			joining(Id, Master, Peer, Peers);
+			joining(Id,N, Master, Peer, Peers);
 		stop ->
 			ok;
 		Error ->
 			io:format("gms ~w: leader, strange message ~w~n", [Id, Error])
 	end.
 	
-joining(Id, Master, Peer, Peers) ->
+joining(Id,N, Master, Peer, Peers) ->
 	receive
 		{ok, State} ->
 			Peers2 = lists:append(Peers, [Peer]),
-			bcast(Id, {view, State, self(), Peers2}, Peers2),
-			leader(Id, Master, Peers2);
+			bcast(Id, {view,N, State, self(), Peers2}, Peers2),
+			leader(Id, Master,N+1, Peers2);
 		stop ->
 			ok
 	end.
