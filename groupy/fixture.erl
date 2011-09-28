@@ -7,8 +7,12 @@ manual()->
 	S1 = worker:start(1,gms,200,Leader,3000),
 	S2 = worker:start(2,gms,400,Leader,2000),
 	S3 = worker:start(3,gms,240,Leader,4000),
-	S4 = worker:start(4,gms,500,Leader,1000),
+	S4 = worker:start(4,gms,500,S2,1000),
 	S5 = worker:start(5,gms,100,Leader,3000),
+	S6 = worker:start(6,gms,600,S5,3050),
+	S7 = worker:start(7,gms,50,S2,3000),
+	S8 = worker:start(8,gms,1100,S6,2000),
+	S9 = worker:start(9,gms,100,S1,3000),
 	timer:sleep(5000),
 	Leader ! stop,
 	timer:sleep(5000)

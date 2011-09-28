@@ -2,19 +2,25 @@
 -export([start/1, start/2]).
 -export([bcast/3, joining/4]).
 
-start(Id) ->
-	Self = self(),
-	spawn_link(fun()-> init(Id, Self) end).
+-define(crashchance, 50). %% one-in-N
 
-init(Id, Master) ->
+start(Id) ->
+	Rnd = random:uniform(1000),
+	Self = self(),
+	spawn_link(fun()-> init(Id,Rnd, Self) end).
+
+init(Id,Rnd, Master) ->
+	random:seed(Rnd,Rnd,Rnd),
 	leader(Id, Master, []).
 
 start(Id, Grp) ->
+	Rnd = random:uniform(1000),
 	Self = self(),
-	spawn_link(fun()-> init(Id, Grp, Self) end).
+	spawn_link(fun()-> init(Id,Rnd, Grp, Self) end).
 	
-init(Id, Grp, Master) ->
+init(Id,Rnd, Grp, Master) ->
 	Self = self(),
+	random:seed(Rnd,Rnd,Rnd),
 	Grp ! {join, Self},
 	receive
 		{view, State, Leader, Peers} ->
@@ -81,5 +87,14 @@ joining(Id, Master, Peer, Peers) ->
 			ok
 	end.
 	
-bcast(_, Msg, Nodes) ->
-	lists:foreach(fun(Node) -> Node ! Msg end, Nodes).
+bcast(Id, Msg, Nodes) ->
+	lists:foreach(fun(Node) -> Node ! Msg, crash(Id) end, Nodes).
+	
+crash(Id) ->
+	case random:uniform(?crashchance) of
+		?crashchance ->
+			io:format("leader ~w: crash~n", [Id]),
+			exit(no_luck);
+		_ ->
+			ok
+	end.
