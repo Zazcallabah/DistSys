@@ -1,0 +1,8 @@
+#!/usr/bin/env escript
+
+main([Str]) ->
+    {Wait,_} = string:to_integer(Str),
+    make:all(),
+    fixture:manual(),
+    timer:sleep(Wait).
+
