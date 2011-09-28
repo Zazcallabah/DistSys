@@ -3,9 +3,16 @@
 -include_lib("eunit/include/eunit.hrl").
 
 manual()->
-	Head = worker:start( 0, gms, 500, 3000 ),
-	worker:start(1,gms,200,Head,3000),
-	worker:start(2,gms,400,Head,3000).
+	Leader = worker:start( 0, gms, 500, 3000 ),
+	S1 = worker:start(1,gms,200,Leader,3000),
+	S2 = worker:start(2,gms,400,Leader,2000),
+	S3 = worker:start(3,gms,240,Leader,4000),
+	S4 = worker:start(4,gms,500,Leader,1000),
+	S5 = worker:start(5,gms,100,Leader,3000),
+	timer:sleep(5000),
+	Leader ! stop,
+	timer:sleep(5000)
+	.
 
 recipient( Count ) ->
 	receive

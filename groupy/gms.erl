@@ -18,8 +18,11 @@ init(Id, Grp, Master) ->
 	Grp ! {join, Self},
 	receive
 		{view, State, Leader, Peers} ->
+			erlang:monitor(process, Leader),
 			Master ! {ok, State},
 			slave(Id, Master, Leader, Peers)
+		after 1000 ->
+			Master ! {error, "no reply from leader"}
 	end.
 	
 slave(Id, Master, Leader, Peers) ->
@@ -35,10 +38,22 @@ slave(Id, Master, Leader, Peers) ->
 			slave(Id, Master, Leader, Peers);
 		{view, _, _, UpdatedPeerList} ->
 			slave(Id, Master, Leader, UpdatedPeerList);
+		{'DOWN', _Ref, process, Leader, _Reason} ->
+			election(Id,Master,Peers);
 		stop ->
 			ok;
 		Error ->
 			io:format("gms ~w: slave, strange message ~w~n", [Id, Error])
+	end.
+	
+election(Id, Master, [Leader|Rest] ) ->
+	io:format("--~w: electing new leader ~w~n",[Id, Leader]),
+	if
+		Leader == self() ->
+			leader(Id,Master,Rest);
+		true ->
+			erlang:monitor(process, Leader),
+			slave( Id, Master,Leader,Rest)
 	end.
 	
 leader(Id, Master, Peers) ->
