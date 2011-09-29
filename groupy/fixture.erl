@@ -1,13 +1,15 @@
 -module(fixture).
--export([manual/0]).
+-export([manual/0,add/1]).
 -include_lib("eunit/include/eunit.hrl").
 
 start(Link,N) ->
 	worker:start(N,gms,600, Link, 2000 ).
 
 manual()->
-	Leader = worker:start( 0, gms, 500, 3000 ),
-	ll( 1, 250, 60, [Leader]).
+	Leader = worker:start( leader, gms, 500, 3000 ).
+
+add( Pid ) ->
+ worker:start( 20, gms, 400, Pid, 2000 ).
 	
 ll( N, Wait, End, Bag )->
 	timer:sleep(  random:uniform(100) ),

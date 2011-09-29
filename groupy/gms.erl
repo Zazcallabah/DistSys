@@ -2,7 +2,7 @@
 -export([start/1, start/2]).
 -export([bcast/3, joining/5]).
 
--define(crashchance, 50). %% one-in-N
+-define(crashchance, 150). %% one-in-N
 
 start(Id) ->
 	Rnd = random:uniform(1000),
@@ -11,6 +11,7 @@ start(Id) ->
 
 init(Id,Rnd, Master) ->
 	random:seed(Rnd,Rnd,Rnd),
+	erlang:register(leader,self()),
 	leader(Id, Master,0, []).
 
 start(Id, Grp) ->
@@ -58,6 +59,7 @@ election(Id, Master,N,Last, [Leader|Rest] ) ->
 	io:format("--~w: electing new leader ~w |~w|~w ~n",[Id, Leader,N,Last]),
 	if
 		Leader == self() ->
+			erlang:register(leader,self()),
 			bcast( Id, Last, Rest ),
 			case Last of
 				{view, M, _,_,_} ->

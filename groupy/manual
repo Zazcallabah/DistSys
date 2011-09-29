@@ -1,8 +1,12 @@
 #!/usr/bin/env escript
+%%! -name pe@130.229.169.176 -setcookie omglol -connect_all false
 
-main([Str]) ->
-    {Wait,_} = string:to_integer(Str),
+main(_) ->
     make:all(),
-    fixture:manual(),
-    timer:sleep(Wait).
+	%% {'pe@130.229.181.78'}},
+     fixture:manual(),
+%%	fixture:add({leader,'t4202@130.229.146.238'}),
+%%	fixture:add({leader,'toni@130.229.173.8'}),
+		io:fread("wait for other shell", "~s")
+.
 
